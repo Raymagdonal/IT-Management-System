@@ -562,7 +562,6 @@ const App: React.FC = () => {
     setActiveTab('assets');
   };
 
-  // Fix: Explicitly type DashboardView as React.FC to resolve "Type '() => void' is not assignable to type 'FC<{}>'"
   const DashboardView: React.FC = () => (
     <div className="space-y-8 pb-10">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -757,54 +756,647 @@ const App: React.FC = () => {
     </div>
   );
 
-  // Fix: Implement the return statement for the App component with Layout and tab switching
+  const WorkLogsView = () => (
+    <div className="space-y-6">
+      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-bold text-slate-800">ประวัติการปฏิบัติงาน (พนักงาน: {PERMANENT_STAFF_NAME})</h3>
+          <ViewSwitcher activeMode={workLogView} onChange={setWorkLogView} />
+        </div>
+        <SearchFilterBar filters={workLogFilters} setFilters={setWorkLogFilters} placeholder="ค้นหาตามสถานที่ หรือรายละเอียดงาน..." showDay={true} />
+      </div>
+
+      <div className="space-y-4">
+        {groupedWorkLogs.length === 0 ? (<div className="bg-white rounded-3xl border border-slate-200 py-20 flex flex-col items-center justify-center text-slate-400"><ClipboardList size={64} className="opacity-10 mb-4"/><p>ไม่พบข้อมูลที่ค้นหา</p></div>) : (
+          groupedWorkLogs.map(group => (
+            <div key={group.date} className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden transition-all">
+              <div className="flex items-center">
+                <button onClick={() => toggleFolder(group.date)} className="flex-1 flex items-center justify-between px-6 py-4 hover:bg-slate-50 transition-colors border-b border-transparent data-[expanded=true]:border-slate-100" data-expanded={expandedDates.has(group.date)}>
+                  <div className="flex items-center gap-4"><div className={`p-2 rounded-xl transition-all duration-300 ${expandedDates.has(group.date) ? 'bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.6)] scale-110' : 'bg-slate-50 text-slate-400 border border-slate-100'}`}><Folder size={20} fill={expandedDates.has(group.date) ? "currentColor" : "none"} /></div><div className="text-left"><h4 className="font-bold text-slate-800 flex items-center gap-2"><Calendar size={14} className="text-slate-400" />{new Date(group.date).toLocaleDateString('th-TH', { dateStyle: 'long' })}</h4><p className="text-xs text-slate-400 font-medium">มีทั้งหมด {group.logs.length} รายการปฏิบัติงาน</p></div></div>
+                  <div className="flex items-center gap-4">{expandedDates.has(group.date) ? <ChevronDown size={20} className="text-slate-400" /> : <ChevronRight size={20} className="text-slate-400" />}</div>
+                </button>
+                <div className="pr-6"><button onClick={() => handleSavePDF(group.date, group.logs)} className="p-3 bg-red-50 text-red-600 rounded-2xl hover:bg-red-100 transition-colors flex items-center gap-2 font-bold text-xs" title="บันทึกเป็น PDF"><FileText size={16} /><span>PDF</span></button></div>
+              </div>
+              {expandedDates.has(group.date) && (
+                <div className="animate-in slide-in-from-top-2 duration-200">
+                  {workLogView === 'grid' || workLogView === 'gallery' ? (
+                    <div className={`p-6 grid gap-4 bg-slate-50/50 ${workLogView === 'gallery' ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-1 md:grid-cols-3'}`}>
+                      {group.logs.map(log => {
+                        const overdue = log.status === TaskStatus.PENDING && isOverdue(log.date, log.time);
+                        return (
+                          <div key={log.id} className={`bg-white p-4 border rounded-2xl group relative hover:border-blue-300 hover:shadow-md transition-all ${overdue ? 'border-red-200 shadow-[0_0_10px_rgba(239,68,68,0.1)]' : 'border-slate-200'}`}>
+                            <div className="flex justify-between items-start mb-2"><span className="text-[10px] text-blue-500 font-mono font-bold bg-blue-50 px-2 py-0.5 rounded-lg">{log.time}</span><div className="flex flex-col items-end gap-1"><span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${log.status === TaskStatus.COMPLETED ? 'bg-emerald-50 text-emerald-600' : overdue ? 'bg-red-50 text-red-600 animate-pulse' : 'bg-blue-50 text-blue-600'}`}>{translateStatus(log.status)}</span>{overdue && <span className="text-[8px] font-black text-red-500">ล่าช้าเกิน 24 ชม.</span>}</div></div>
+                            <div className="flex items-center gap-3 text-slate-800 font-bold text-sm mb-1"><LocationIcon locationName={log.location} size={14} /><span className="truncate">{log.location}</span></div>
+                            <p className="text-xs text-slate-500 line-clamp-2">{log.taskDescription}</p>
+                            <div className="flex gap-2 mt-4 opacity-0 group-hover:opacity-100 transition-opacity justify-end border-t pt-3 border-slate-50">
+                              <button onClick={(e) => { e.stopPropagation(); setEditingWorkLog(log); }} className="p-1.5 hover:bg-blue-50 rounded-lg text-blue-500 transition-colors"><Edit2 size={14}/></button>
+                              <LongPressDeleteButton onDelete={() => deleteWorkLog(log.id)} size={14} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="bg-slate-50/30 overflow-x-auto"><table className="w-full text-left table-fixed"><thead className="bg-slate-100/50"><tr className="text-[10px] uppercase font-bold text-slate-500"><th className="px-6 py-3 border-r border-slate-300 last:border-r-0 w-20 md:w-24">เวลา</th><th className="px-6 py-3 border-r border-slate-300 last:border-r-0 w-32 md:w-48">สถานที่</th><th className="px-6 py-3 border-r border-slate-300 last:border-r-0 w-48 md:w-64">รายละเอียดงาน</th><th className="px-6 py-3 border-r border-slate-300 last:border-r-0 w-28 md:w-32">สถานะ</th><th className="px-6 py-3 w-20 md:w-24">จัดการ</th></tr></thead><tbody className="divide-y divide-slate-100">
+                      {group.logs.map(log => {
+                        const overdue = log.status === TaskStatus.PENDING && isOverdue(log.date, log.time);
+                        return (
+                          <tr key={log.id} className={`hover:bg-blue-50/20 transition-colors ${workLogView === 'compact' ? 'text-xs' : 'text-sm'}`}><td className={`px-6 ${workLogView === 'compact' ? 'py-2' : 'py-4'} text-blue-500 font-mono font-bold border-r border-slate-300 last:border-r-0`}>{log.time}</td><td className={`px-6 ${workLogView === 'compact' ? 'py-2' : 'py-4'} font-bold text-slate-800 border-r border-slate-300 last:border-r-0`}><div className="flex items-center gap-3 truncate"><LocationIcon locationName={log.location} size={14} /><span className="truncate">{log.location}</span></div></td><td className={`px-6 ${workLogView === 'compact' ? 'py-2' : 'py-4'} text-slate-600 border-r border-slate-300 last:border-r-0`}><div className="truncate" title={log.taskDescription}>{log.taskDescription}</div></td><td className={`px-6 ${workLogView === 'compact' ? 'py-2' : 'py-4'} border-r border-slate-300 last:border-r-0`}><div className="flex flex-col gap-0.5"><span className={`px-2 py-0.5 rounded-full font-bold text-[10px] w-fit ${log.status === TaskStatus.COMPLETED ? 'bg-emerald-50 text-emerald-600' : overdue ? 'bg-red-50 text-red-600 animate-pulse' : 'bg-blue-50 text-blue-600'}`}>{translateStatus(log.status)}</span>{overdue && <span className="text-[8px] font-black text-red-500 whitespace-nowrap">ล่าช้าเกิน 24 ชม.</span>}</div></td><td className={`px-6 ${workLogView === 'compact' ? 'py-2' : 'py-4'}`}>
+                            <div className="flex gap-2">
+                              <button onClick={(e) => { e.stopPropagation(); setEditingWorkLog(log); }} className="text-slate-400 hover:text-blue-600 transition-colors"><Edit2 size={16}/></button>
+                              <LongPressDeleteButton onDelete={() => deleteWorkLog(log.id)} size={16} />
+                            </div>
+                          </td></tr>
+                        );
+                      })}
+                    </tbody></table></div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mt-8 text-slate-900">
+        <h3 className="text-lg font-bold text-slate-800 mb-6">ลงบันทึกงานใหม่</h3>
+        <form className="grid grid-cols-1 md:grid-cols-5 gap-4" onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget); addWorkLog({ date: f.get('date') as string, time: f.get('time') as string, location: f.get('location') as string, taskDescription: f.get('taskDescription') as string, status: f.get('status') as TaskStatus }); e.currentTarget.reset(); }}>
+          <input name="date" type="date" className="p-3 border border-slate-200 rounded-2xl bg-white text-slate-900 focus:ring-2 focus:ring-blue-500 shadow-sm" defaultValue={new Date().toISOString().split('T')[0]} />
+          <input name="time" type="time" className="p-3 border border-slate-200 rounded-2xl bg-white text-slate-900 focus:ring-2 focus:ring-blue-500 shadow-sm" defaultValue={new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} />
+          <input name="location" type="text" placeholder="สถานที่" className="p-3 border border-slate-200 rounded-2xl bg-white text-slate-900 focus:ring-2 focus:ring-blue-500 shadow-sm" />
+          <input name="taskDescription" type="text" placeholder="รายละเอียดงาน" className="p-3 border border-slate-200 rounded-2xl bg-white text-slate-900 focus:ring-2 focus:ring-blue-500 shadow-sm" />
+          <div className="flex gap-2"><select name="status" className="flex-1 p-3 border border-slate-200 rounded-2xl bg-white text-slate-900 focus:ring-2 focus:ring-blue-500 shadow-sm"><option value={TaskStatus.PENDING}>รอดำเนินการ</option><option value={TaskStatus.IN_PROGRESS}>กำลังดำเนินการ</option><option value={TaskStatus.COMPLETED}>เสร็จสิ้น</option></select><button type="submit" className="bg-blue-600 text-white p-3 rounded-2xl shadow-lg shadow-blue-500/20 hover:scale-105 active:scale-95 transition-all"><Plus size={24}/></button></div>
+        </form>
+      </div>
+
+      {editingWorkLog && (
+        <Modal title="แก้ไขบันทึกงาน" onClose={() => setEditingWorkLog(null)}>
+          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget); updateWorkLog({ ...editingWorkLog, date: f.get('date') as string, time: f.get('time') as string, location: f.get('location') as string, taskDescription: f.get('taskDescription') as string, status: f.get('status') as TaskStatus }); }}>
+            <div className="grid grid-cols-2 gap-4"><div className="space-y-1"><label className="text-xs font-bold text-slate-500">วันที่</label><input name="date" type="date" className="w-full p-3 border border-slate-200 rounded-2xl bg-white text-slate-900" defaultValue={editingWorkLog.date} /></div><div className="space-y-1"><label className="text-xs font-bold text-slate-500">เวลา</label><input name="time" type="time" className="w-full p-3 border border-slate-200 rounded-2xl bg-white text-slate-900 font-mono" defaultValue={editingWorkLog.time} /></div></div>
+            <div className="space-y-1"><label className="text-xs font-bold text-slate-500">สถานที่</label><input name="location" type="text" className="w-full p-3 border border-slate-200 rounded-2xl bg-white text-slate-900 shadow-sm" defaultValue={editingWorkLog.location} /></div>
+            <div className="space-y-1"><label className="text-xs font-bold text-slate-500">รายละเอียดงาน</label><textarea name="taskDescription" className="w-full p-3 border border-slate-200 rounded-2xl bg-white text-slate-900 h-24 shadow-sm" defaultValue={editingWorkLog.taskDescription} /></div>
+            <div className="space-y-1"><label className="text-xs font-bold text-slate-500">สถานะ</label><select name="status" className="w-full p-3 border border-slate-200 rounded-2xl bg-white text-slate-900 shadow-sm" defaultValue={editingWorkLog.status}><option value={TaskStatus.PENDING}>รอดำเนินการ</option><option value={TaskStatus.IN_PROGRESS}>กำลังดำเนินการ</option><option value={TaskStatus.COMPLETED}>เสร็จสิ้น</option></select></div>
+            <div className="flex gap-4 pt-4"><button type="button" onClick={() => setEditingWorkLog(null)} className="flex-1 py-3 bg-slate-100 rounded-2xl font-bold text-slate-600">ยกเลิก</button><button type="submit" className="flex-1 py-3 bg-blue-600 text-white rounded-2xl font-bold">บันทึก</button></div>
+          </form>
+        </Modal>
+      )}
+    </div>
+  );
+
+  const InspectionsView = () => {
+    const [shipName, setShipName] = useState('');
+    const [newLabel, setNewLabel] = useState('');
+    const [inspectionItems, setInspectionItems] = useState<InspectionImage[]>([
+      { id: 'start-1', label: 'กล้องหน้าเรือ', url: null, status: 'Normal', details: '' },
+      { id: 'start-2', label: 'แอมป์', url: null, status: 'Normal', details: '' },
+      { id: 'start-3', label: 'ลำโพง', url: null, status: 'Normal', details: '' },
+      { id: 'start-4', label: 'VIABUS', url: null, status: 'Normal', details: '' },
+      { id: 'start-5', label: 'จอแสดงผล', url: null, status: 'Normal', details: '' },
+    ]);
+
+    const addDeviceSlot = () => {
+      if (!newLabel.trim()) return;
+      setInspectionItems(prev => [...prev, { id: `new-slot-${Date.now()}`, label: newLabel, url: null, status: 'Normal', details: '' }]);
+      setNewLabel('');
+    };
+
+    const removeDeviceSlot = (id: string) => {
+      setInspectionItems(prev => prev.filter(item => item.id !== id));
+    };
+
+    const updateSlotLabel = (id: string, label: string) => {
+      setInspectionItems(prev => prev.map(item => item.id === id ? { ...item, label } : item));
+    };
+
+    const updateSlotStatus = (id: string, status: any) => {
+      setInspectionItems(prev => prev.map(item => item.id === id ? { ...item, status } : item));
+    };
+
+    const updateSlotDetails = (id: string, details: string) => {
+      setInspectionItems(prev => prev.map(item => item.id === id ? { ...item, details } : item));
+    };
+
+    const handleFileChange = async (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        if (!file.type.match('image/jp.*')) {
+          alert('กรุณาอัปโหลดไฟล์นามสกุล .jpg หรือ .jpeg เท่านั้น');
+          return;
+        }
+        const base64 = await fileToBase64(file);
+        setInspectionItems(prev => prev.map(item => item.id === id ? { ...item, url: base64 } : item));
+      }
+    };
+
+    const clearImage = (id: string) => {
+      setInspectionItems(prev => prev.map(item => item.id === id ? { ...item, url: null } : item));
+    };
+
+    const handleAdd = (e: React.FormEvent) => {
+      e.preventDefault();
+      addInspection({ shipName: shipName || "ไม่ระบุชื่อเรือ", images: inspectionItems });
+      setShipName('');
+      setInspectionItems([
+        { id: 'start-1', label: 'กล้องหน้าเรือ', url: null, status: 'Normal', details: '' },
+        { id: 'start-2', label: 'แอมป์', url: null, status: 'Normal', details: '' },
+        { id: 'start-3', label: 'ลำโพง', url: null, status: 'Normal', details: '' },
+        { id: 'start-4', label: 'VIABUS', url: null, status: 'Normal', details: '' },
+        { id: 'start-5', label: 'จอแสดงผล', url: null, status: 'Normal', details: '' },
+      ]);
+    };
+
+    return (
+      <div className="space-y-8 text-slate-900">
+        <div className="space-y-6">
+          <div className="flex items-center justify-between px-2">
+            <h4 className="text-sm font-black text-slate-500 uppercase tracking-widest">ประวัติการตรวจสอบ</h4>
+            <ViewSwitcher activeMode={inspectionView} onChange={setInspectionView} />
+          </div>
+          <SearchFilterBar filters={inspectionFilters} setFilters={setInspectionFilters} placeholder="ค้นหาตามชื่อเรือหรือชื่อผู้ตรวจ..." />
+          
+          {groupedInspections.length === 0 ? (
+            <div className="bg-white py-20 rounded-3xl border border-slate-200 flex flex-col items-center justify-center text-slate-300">
+              <Camera size={64} className="opacity-20 mb-4" />
+              <p className="font-bold text-sm">ไม่พบรายงานการตรวจสอบ</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {groupedInspections.map(group => (
+                <div key={group.date} className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden transition-all">
+                  <button 
+                    onClick={() => toggleInspectionFolder(group.date)}
+                    className="w-full flex items-center justify-between px-8 py-5 hover:bg-slate-50 transition-colors border-b border-transparent data-[expanded=true]:border-slate-100"
+                    data-expanded={expandedInspectionDates.has(group.date)}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`p-2.5 rounded-2xl transition-all duration-300 ${expandedInspectionDates.has(group.date) ? 'bg-red-500 text-white shadow-lg shadow-red-500/30' : 'bg-slate-50 text-slate-400 border border-slate-100'}`}>
+                        <Folder size={20} fill={expandedInspectionDates.has(group.date) ? "currentColor" : "none"} />
+                      </div>
+                      <div className="text-left">
+                        <h4 className="font-black text-slate-800 flex items-center gap-2 uppercase tracking-tight">
+                          <Calendar size={14} className="text-slate-400" />
+                          {new Date(group.date).toLocaleDateString('th-TH', { dateStyle: 'long' })}
+                        </h4>
+                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">พบข้อมูลการตรวจ {group.items.length} ลำ</p>
+                      </div>
+                    </div>
+                    {expandedInspectionDates.has(group.date) ? <ChevronDown size={22} className="text-slate-400" /> : <ChevronRight size={22} className="text-slate-400" />}
+                  </button>
+                  
+                  {expandedInspectionDates.has(group.date) && (
+                    <div className="p-8 bg-slate-50/30 animate-in slide-in-from-top-2 duration-200">
+                      <div className={`grid gap-6 ${inspectionView === 'grid' || inspectionView === 'gallery' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
+                        {group.items.map(ins => (
+                          <div key={ins.id} className="bg-white border-2 border-slate-100 rounded-[2rem] overflow-hidden shadow-sm group hover:border-red-500 hover:shadow-xl transition-all duration-300">
+                            <div className="p-6 border-b border-slate-50 flex items-center justify-between">
+                              <div>
+                                <h5 className="font-black text-slate-900 text-lg group-hover:text-red-600 transition-colors uppercase tracking-tight">{ins.shipName}</h5>
+                                <div className="flex items-center gap-3 mt-1">
+                                  <span className="text-[9px] font-black text-red-500 uppercase tracking-widest">โดย {ins.inspector}</span>
+                                </div>
+                              </div>
+                              <div className="flex gap-1">
+                                <button onClick={() => setEditingInspection(ins)} className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 hover:text-blue-500 transition-colors"><Edit2 size={16}/></button>
+                                <LongPressDeleteButton onDelete={() => deleteInspection(ins.id)} size={16} />
+                              </div>
+                            </div>
+                            <div className="p-5 bg-slate-50/20 grid grid-cols-2 gap-3">
+                              {ins.images.map((img, i) => (
+                                <div key={img.id} className="space-y-1">
+                                  <div className="aspect-square bg-white border border-slate-100 rounded-2xl overflow-hidden cursor-pointer group/img" onClick={() => img.url && setLightboxData({ images: ins.images.filter(x => x.url).map(x => x.url!), index: i })}>
+                                    {img.url ? (
+                                      <div className="w-full h-full relative">
+                                        <img src={img.url} className="w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-500" />
+                                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
+                                          <Maximize2 size={18} className="text-white" />
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center text-slate-200">
+                                        <ImageIcon size={20}/>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-col items-center">
+                                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase border ${getStatusColor(img.status)}`}>
+                                      {translateInspectionStatus(img.status)}
+                                    </span>
+                                    <p className="text-[9px] font-black text-slate-500 text-center uppercase tracking-widest truncate w-full mt-1">{img.label}</p>
+                                    {img.details && <p className="text-[8px] text-slate-400 text-center line-clamp-2 w-full px-1">{img.details}</p>}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm mt-10">
+          <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-6 flex items-center gap-2">
+            <Camera className="text-red-500" />ตรวจอุปกรณ์ในเรือ (ลำใหม่)
+          </h3>
+          <form className="space-y-8" onSubmit={handleAdd}>
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">ชื่อเรือ / หมายเลขเรือ</label>
+                <input 
+                  type="text" 
+                  placeholder="ระบุชื่อเรือ..." 
+                  className="w-full p-4 bg-slate-50 border border-slate-100 rounded-[1.5rem] focus:ring-2 focus:ring-red-500 focus:outline-none font-bold text-lg shadow-inner" 
+                  value={shipName}
+                  onChange={(e) => setShipName(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">เพิ่มรายการอุปกรณ์</label>
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <input 
+                      type="text" 
+                      placeholder="เช่น กล้องหน้าเรือ, แอมป์..." 
+                      className="w-full p-4 bg-white border border-slate-200 rounded-[1.5rem] focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium text-slate-600 transition-all placeholder:text-slate-300" 
+                      value={newLabel}
+                      onChange={(e) => setNewLabel(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addDeviceSlot())}
+                    />
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={addDeviceSlot}
+                    className="bg-[#1e293b] text-white px-10 rounded-[1.5rem] font-bold text-sm hover:bg-slate-900 transition-all active:scale-95 flex items-center gap-2 shadow-lg shadow-slate-200"
+                  >
+                    <Plus size={18} strokeWidth={3} /> เพิ่มรายการ
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {inspectionItems.map(item => (
+                <div key={item.id} className="bg-white border-2 border-slate-50 rounded-[2.5rem] p-5 space-y-4 hover:border-red-100 transition-all shadow-[0_10px_30px_rgba(0,0,0,0.02)] group relative">
+                  <div className="flex items-center justify-between gap-2">
+                    <input 
+                      type="text"
+                      className="flex-1 bg-slate-50 border border-transparent hover:border-slate-200 focus:border-blue-400 focus:bg-white p-2 rounded-xl text-[11px] font-black uppercase tracking-widest text-slate-600 focus:outline-none transition-all text-center"
+                      value={item.label}
+                      onChange={(e) => updateSlotLabel(item.id, e.target.value)}
+                      placeholder="ชื่ออุปกรณ์..."
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => removeDeviceSlot(item.id)} 
+                      className="text-slate-300 hover:text-red-500 p-1.5 rounded-xl transition-colors opacity-0 group-hover:opacity-100"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+
+                  <div className="relative">
+                    <label className="block w-full aspect-video bg-slate-50 border-2 border-dashed border-slate-100 rounded-[2rem] overflow-hidden cursor-pointer hover:border-red-400 hover:bg-red-50/20 transition-all relative group/img shadow-sm">
+                      {item.url ? (
+                        <>
+                          <img src={item.url} alt={item.label} className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
+                            <div className="bg-white/20 backdrop-blur-md p-3 rounded-full border border-white/30 text-white">
+                              <Camera size={24} />
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-200 group-hover/img:text-red-300 transition-colors">
+                          <ImageIcon size={32} strokeWidth={1.5} />
+                          <span className="text-[8px] font-black mt-2 uppercase tracking-[0.2em] opacity-40">UPLOAD JPG</span>
+                        </div>
+                      )}
+                      <input type="file" accept="image/jpeg" className="hidden" onChange={(e) => handleFileChange(item.id, e)} />
+                    </label>
+                    {item.url && (
+                      <button 
+                        type="button" 
+                        onClick={() => clearImage(item.id)} 
+                        className="absolute -top-2 -right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg hover:scale-110 active:scale-90 transition-all z-20 border-2 border-white"
+                      >
+                        <X size={10} strokeWidth={4} />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1">สถานะอุปกรณ์</label>
+                      <select 
+                        className={`w-full p-2.5 rounded-xl text-[10px] font-black border-2 focus:outline-none transition-all ${getStatusColor(item.status)}`}
+                        value={item.status}
+                        onChange={(e) => updateSlotStatus(item.id, e.target.value as any)}
+                      >
+                        <option value="Normal">ปกติ (Normal)</option>
+                        <option value="Broken">ชำรุด (Broken)</option>
+                        <option value="Lost">สูญหาย (Lost)</option>
+                        <option value="Claiming">ส่งเคลม (Claiming)</option>
+                        <option value="WaitingPurchase">รอจัดซื้อ (Wait)</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1">รายละเอียด (2 บรรทัด)</label>
+                      <textarea 
+                        className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-medium text-slate-600 focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none transition-all resize-none h-[60px]"
+                        placeholder="ระบุรายละเอียดอุปกรณ์..."
+                        rows={2}
+                        value={item.details}
+                        onChange={(e) => updateSlotDetails(item.id, e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <div className="pt-8 border-t border-slate-50 flex justify-end">
+              <button 
+                type="submit" 
+                className="bg-gradient-to-br from-red-600 to-red-500 text-white px-14 py-5 rounded-[1.75rem] font-black text-sm uppercase tracking-[0.2em] shadow-2xl shadow-red-500/30 hover:scale-105 active:scale-95 transition-all"
+              >
+                บันทึกรายงานการตรวจ
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  const UnifiedTicketView = ({ type }: { type: TicketType }) => {
+    const filters = type === TicketType.REPAIR ? repairFilters : purchaseFilters;
+    const setFilters = type === TicketType.REPAIR ? setRepairFilters : setPurchaseFilters;
+    const filteredList = type === TicketType.REPAIR ? filteredRepairs : filteredPurchases;
+    const [tempImages, setTempImages] = useState<string[]>([]);
+    
+    // State for auto-calculation in purchase form
+    const [purchaseQty, setPurchaseQty] = useState<number>(0);
+    const [purchasePrice, setPurchasePrice] = useState<number>(0);
+    const [isVatInclusive, setIsVatInclusive] = useState<boolean>(true);
+
+    const handleAddImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        const base64 = await fileToBase64(file);
+        setTempImages(prev => [...prev, base64]);
+      }
+    };
+
+    const handleRemoveImage = (idx: number) => {
+      setTempImages(prev => prev.filter((_, i) => i !== idx));
+    };
+
+    const calculateTotal = (qty: number, price: number, vatInclusive: boolean) => {
+      const base = qty * price;
+      if (vatInclusive) return base;
+      return base + (base * 0.07);
+    };
+
+    const handleCreateTicket = (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      const f = new FormData(e.currentTarget);
+      
+      const qty = type === TicketType.PURCHASE ? Number(f.get('quantity')) : undefined;
+      const price = type === TicketType.PURCHASE ? Number(f.get('price')) : undefined;
+      
+      addTicket({ 
+        type, 
+        subject: (f.get('subject') as string) || "ไม่ระบุหัวข้อ", 
+        details: (f.get('details') as string) || "-", 
+        location: (f.get('location') as string) || "ไม่ระบุสถานที่", 
+        status: (f.get('status') as TaskStatus) || (type === TicketType.PURCHASE ? TaskStatus.WAITING_PURCHASE : TaskStatus.PENDING),
+        images: tempImages,
+        requesterName: (f.get('requesterName') as string) || "ไม่ระบุชื่อ",
+        requesterPosition: (f.get('requesterPosition') as string) || "-",
+        companyName: type === TicketType.PURCHASE ? (f.get('companyName') as string) : undefined,
+        quantity: qty,
+        price: price,
+        isVatInclusive: type === TicketType.PURCHASE ? isVatInclusive : undefined,
+        totalPrice: qty && price ? calculateTotal(qty, price, isVatInclusive) : undefined
+      });
+      setTempImages([]);
+      setPurchaseQty(0);
+      setPurchasePrice(0);
+      e.currentTarget.reset();
+    };
+
+    return (
+      <div className="space-y-6 text-slate-900">
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-bold text-slate-800">
+              {type === TicketType.REPAIR ? 'รายการแจ้งซ่อมอุปกรณ์' : 'รายการขออนุมัติจัดซื้อ'}
+            </h3>
+            <ViewSwitcher activeMode={ticketView} onChange={setTicketView} />
+          </div>
+          <SearchFilterBar filters={filters} setFilters={setFilters} placeholder="ค้นหาหัวข้อ หรือสถานที่..." />
+        </div>
+
+        <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden min-h-[400px]">
+          {filteredList.length === 0 ? (
+            <div className="py-20 flex flex-col items-center justify-center text-slate-400">
+              {type === TicketType.REPAIR ? <Wrench size={64} className="opacity-10 mb-4"/> : <ShoppingCart size={64} className="opacity-10 mb-4"/>}
+              <p>ไม่พบรายการที่ค้นหา</p>
+            </div>
+          ) : (
+            ticketView === 'grid' || ticketView === 'gallery' ? (
+              <div className={`p-8 grid gap-8 ${ticketView === 'gallery' ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-1 md:grid-cols-3'}`}>
+                {filteredList.map(ticket => {
+                  const overdue = ticket.status === TaskStatus.PENDING && isOverdue(ticket.createdAt);
+                  return (
+                    <div key={ticket.id} className={`bg-white border rounded-[2rem] overflow-hidden shadow-sm flex flex-col group hover:shadow-xl transition-all duration-300 ${overdue ? 'border-red-200 shadow-[0_0_30px_rgba(239,68,68,0.1)]' : 'border-slate-200'}`}>
+                      <div className={`h-2 ${ticket.type === TicketType.REPAIR ? 'bg-orange-500' : 'bg-blue-600'}`} />
+                      {ticket.images && ticket.images.length > 0 ? (
+                        <div className="w-full h-56 overflow-hidden relative border-b border-slate-50 cursor-zoom-in group/img" onClick={() => setLightboxData({ images: ticket.images!, index: 0 })}>
+                          <img src={ticket.images[0]} className="w-full h-full object-cover transition-transform duration-700 group-hover/img:scale-110" />
+                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
+                             <Maximize2 className="text-white drop-shadow-lg" size={32} />
+                          </div>
+                        </div>
+                      ) : (<div className="w-full h-56 bg-slate-50 flex items-center justify-center text-slate-200"><ImageIcon size={48} strokeWidth={1} /></div>)}
+                      <div className="p-7 flex-1 flex flex-col">
+                        <div className="flex justify-between items-start mb-5">
+                          <span className={`text-sm font-black px-4 py-1.5 rounded-full shadow-sm uppercase tracking-tight ${ticket.type === TicketType.REPAIR ? 'bg-orange-100 text-orange-700 shadow-orange-100' : 'bg-blue-100 text-blue-700 shadow-blue-100'}`}>{ticket.type === TicketType.REPAIR ? 'แจ้งซ่อม' : 'จัดซื้อ'}</span>
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => setEditingTicket(ticket)} className="p-2 hover:bg-slate-50 rounded-xl text-blue-500 transition-colors"><Edit2 size={18}/></button>
+                            <LongPressDeleteButton onDelete={() => deleteTicket(ticket.id)} size={18} />
+                          </div>
+                        </div>
+                        <h4 className="text-xl font-black text-slate-900 mb-3 leading-tight uppercase tracking-tight">{ticket.subject}</h4>
+                        
+                        {ticket.type === TicketType.PURCHASE && (
+                          <div className="grid grid-cols-2 gap-2 mb-4">
+                             <div className="bg-blue-50/50 p-2 rounded-xl border border-blue-100 flex items-center gap-2">
+                                <Store size={14} className="text-blue-500 shrink-0" />
+                                <span className="text-[10px] font-black text-slate-600 truncate uppercase tracking-tight">{ticket.companyName || "ไม่ระบุร้าน"}</span>
+                             </div>
+                             <div className="bg-emerald-50/50 p-2 rounded-xl border border-emerald-100 flex items-center gap-2">
+                                <Coins size={14} className="text-emerald-500 shrink-0" />
+                                <span className="text-[10px] font-black text-emerald-700 truncate uppercase tracking-tight">
+                                  {ticket.totalPrice?.toLocaleString()} บาท
+                                </span>
+                             </div>
+                          </div>
+                        )}
+
+                        <p className="text-sm text-slate-500 flex-1 line-clamp-3 mb-4 font-medium">{ticket.details}</p>
+                        
+                        {(ticket.requesterName || ticket.requesterPosition) && (
+                          <div className="flex flex-col gap-1 mb-4 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                             {ticket.requesterName && <div className="flex items-center gap-2 text-xs font-bold text-slate-700"><User size={12} className="text-blue-500" />{ticket.requesterName}</div>}
+                             {ticket.requesterPosition && <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase"><Briefcase size={12} className="text-slate-300" />{ticket.requesterPosition}</div>}
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-3 text-[11px] text-slate-400 mb-6 bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100 font-bold uppercase tracking-wider"><MapPin size={14} className="text-slate-300"/><span className="truncate">{ticket.location}</span></div>
+                        <div className="pt-5 border-t border-slate-50 flex items-center justify-between">
+                          <select 
+                            value={ticket.status} 
+                            onChange={(e) => updateTicketStatus(ticket.id, e.target.value as TaskStatus)} 
+                            className={`text-xs font-black px-3 py-1.5 border-none rounded-xl focus:ring-2 focus:ring-blue-500 shadow-sm cursor-pointer ${overdue ? 'bg-red-50 text-red-600 animate-pulse' : (ticket.status === TaskStatus.WAITING_PURCHASE ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-700')}`}
+                          >
+                            {type === TicketType.REPAIR ? (
+                              <>
+                                <option value={TaskStatus.PENDING}>รอรับเรื่อง</option>
+                                <option value={TaskStatus.IN_PROGRESS}>ดำเนินการ</option>
+                                <option value={TaskStatus.COMPLETED}>เสร็จสิ้น</option>
+                              </>
+                            ) : (
+                              <>
+                                <option value={TaskStatus.WAITING_PURCHASE}>รอจัดซื้อ</option>
+                                <option value={TaskStatus.IN_PROGRESS}>สั่งซื้อแล้ว</option>
+                                <option value={TaskStatus.COMPLETED}>รับของแล้ว</option>
+                              </>
+                            )}
+                          </select>
+                          <span className="text-[10px] text-slate-300 font-black uppercase tracking-widest">{new Date(ticket.createdAt).toLocaleDateString('th-TH')}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="overflow-x-auto"><table className="w-full text-left"><thead className="bg-slate-50 border-b border-slate-100"><tr className="text-[10px] uppercase font-bold text-slate-500"><th className="px-8 py-4 border-r border-slate-300 last:border-r-0 whitespace-nowrap">หัวข้อ {type === TicketType.PURCHASE && '/ ผู้ขอ'}</th><th className="px-8 py-4 border-r border-slate-300 last:border-r-0">สถานที่</th>{type === TicketType.PURCHASE && <th className="px-8 py-4 border-r border-slate-300 last:border-r-0">ราคารวมสุทธิ</th>}<th className="px-8 py-4 border-r border-slate-300 last:border-r-0 text-center">รูปภาพ</th><th className="px-8 py-4 border-r border-slate-300 last:border-r-0">สถานะ</th><th className="px-8 py-4">จัดการ</th></tr></thead><tbody className="divide-y divide-slate-100 text-slate-800">
+                {filteredList.map(ticket => (
+                    <tr key={ticket.id} className={`hover:bg-slate-50 transition-colors ${ticketView === 'compact' ? 'text-xs' : 'text-sm'}`}>
+                      <td className={`px-8 ${ticketView === 'compact' ? 'py-1' : 'py-5'} border-r border-slate-300 last:border-r-0 truncate max-w-[200px]`}>
+                        <div className="font-black text-slate-900">{ticket.subject}</div>
+                      </td>
+                      <td className={`px-8 ${ticketView === 'compact' ? 'py-1' : 'py-5'} border-r border-slate-300 last:border-r-0 text-slate-500 font-bold`}>{ticket.location}</td>
+                      {type === TicketType.PURCHASE && (
+                        <td className={`px-8 ${ticketView === 'compact' ? 'py-1' : 'py-5'} border-r border-slate-300 last:border-r-0 font-black text-emerald-600`}>
+                          {ticket.totalPrice?.toLocaleString()}
+                        </td>
+                      )}
+                      <td className={`px-8 ${ticketView === 'compact' ? 'py-1' : 'py-5'} border-r border-slate-300 last:border-r-0 text-center`}>{ticket.images && ticket.images.length > 0 ? (<div className="flex items-center justify-center cursor-zoom-in" onClick={() => setLightboxData({ images: ticket.images!, index: 0 })}><ImageIcon size={18} className="text-blue-500" /></div>) : <span className="text-slate-300">-</span>}</td>
+                      <td className={`px-8 ${ticketView === 'compact' ? 'py-1' : 'py-5'} border-r border-slate-300 last:border-r-0`}>
+                        <span className="text-[10px] font-black">{translateStatus(ticket.status)}</span>
+                      </td>
+                      <td className={`px-8 ${ticketView === 'compact' ? 'py-1' : 'py-5'}`}><div className="flex gap-2"><button onClick={() => setEditingTicket(ticket)} className="text-slate-400 hover:text-blue-600 transition-colors p-1.5"><Edit2 size={16}/></button><LongPressDeleteButton onDelete={() => deleteTicket(ticket.id)} size={16} /></div></td>
+                    </tr>
+                ))}
+              </tbody></table></div>
+            )
+          )}
+        </div>
+
+        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm mt-8">
+          <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2">
+            {type === TicketType.REPAIR ? <Wrench className="text-orange-500" size={20} /> : <ShoppingCart className="text-blue-600" size={20} />}
+            ลงบันทึกใหม่
+          </h3>
+          <form className="space-y-6" onSubmit={handleCreateTicket}>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <input name="subject" type="text" placeholder="หัวข้อ" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
+              <input name="location" type="text" placeholder="สถานที่" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl" />
+              <select name="status" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold">
+                 <option value={TaskStatus.PENDING}>รอดำเนินการ</option>
+                 <option value={TaskStatus.IN_PROGRESS}>กำลังทำ</option>
+              </select>
+            </div>
+            <textarea name="details" placeholder="รายละเอียด" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl h-24" />
+            <div className="flex justify-end">
+              <button type="submit" className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold">บันทึก</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  const AssetsView = () => {
+    const glowInputStyle = "p-3 border-2 border-slate-200 rounded-2xl bg-white text-slate-900 shadow-sm transition-all duration-300 focus:outline-none focus:border-blue-500 focus:shadow-[0_0_15px_rgba(59,130,246,0.4)]";
+
+    return (
+      <div className="space-y-6 text-slate-900">
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-bold text-slate-800">ทะเบียนคลังอุปกรณ์ไอที</h3>
+            <ViewSwitcher activeMode={assetView} onChange={setAssetView} />
+          </div>
+          <SearchFilterBar filters={assetFilters} setFilters={setAssetFilters} placeholder="ค้นหาอุปกรณ์..." />
+        </div>
+
+        <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden min-h-[400px]">
+          {groupedAssets.length === 0 ? (<div className="flex flex-col items-center justify-center py-20 text-slate-400"><Anchor size={64} className="opacity-10 mb-4"/><p>ไม่พบอุปกรณ์</p></div>) : (
+            <div className="overflow-x-auto"><table className="w-full text-left"><thead className="bg-slate-50 border-b border-slate-100"><tr className="text-[10px] font-black text-slate-400"><th>ชื่ออุปกรณ์</th><th>จำนวน</th><th>ใช้งาน</th><th>จัดการ</th></tr></thead><tbody className="divide-y divide-slate-100">
+                  {groupedAssets.map(group => (
+                    <tr key={group.name} className="hover:bg-slate-50 cursor-pointer transition-colors" onClick={() => toggleAssetFolder(group.name)}>
+                      <td className="px-8 py-5 border-r border-slate-200 last:border-r-0"><div className="flex items-center gap-4"><div className={`p-2.5 rounded-2xl shadow-sm transition-all duration-300 ${expandedAssetNames.has(group.name) ? 'bg-blue-600 text-white scale-110 shadow-blue-500/30' : 'bg-slate-100 text-slate-400'}`}><Folder size={20} fill={expandedAssetNames.has(group.name) ? 'currentColor' : 'none'} /></div><div className="flex flex-col"><span className="font-black text-slate-800 tracking-tight">{group.name}</span></div></div></td>
+                      <td className="px-8 py-5 text-center"><span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-xl text-xs font-black">{group.total}</span></td>
+                      <td className="px-8 py-5 text-center"><span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-black">{group.active}</span></td>
+                      <td className="px-8 py-5 text-right">{expandedAssetNames.has(group.name) ? <ChevronDown size={22} className="text-slate-300" /> : <ChevronRight size={22} className="text-slate-300" />}</td>
+                    </tr>
+                  ))}
+            </tbody></table></div>
+          )}
+        </div>
+
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mt-8">
+          <h3 className="text-lg font-bold text-slate-800 mb-6">เพิ่มอุปกรณ์</h3>
+          <form className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4" onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget); addAsset({ name: (f.get('name') as string) || "ไม่ระบุชื่อ", serialNumber: (f.get('serial') as string) || "N/A", category: (f.get('category') as string) || "ทั่วไป", locationCategory: f.get('locCat') as LocationCategory, locationName: (f.get('locName') as string) || "ไม่ระบุสถานที่", staffName: (f.get('staffName') as string) || "ไม่ระบุ", status: 'Active', lastChecked: new Date().toISOString().split('T')[0] }); e.currentTarget.reset(); }}>
+            <input name="name" type="text" placeholder="ชื่อ" className={glowInputStyle} />
+            <input name="serial" type="text" placeholder="S/N" className={glowInputStyle} />
+            <button type="submit" className="bg-blue-600 text-white p-3 rounded-2xl">เพิ่ม</button>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  const SettingsView = () => (
+    <div className="max-w-2xl space-y-8 text-slate-900">
+      <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col gap-6">
+        <div><h3 className="text-xl font-bold text-slate-900 mb-2">จัดการข้อมูล</h3></div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <button className="p-6 rounded-3xl bg-blue-50 border border-blue-100 flex flex-col items-center" onClick={handleExport}><Download size={28} className="mb-4 text-blue-600" /><span>Export JSON</span></button>
+          <div className="p-6 rounded-3xl bg-slate-50 border border-slate-200 flex flex-col items-center"><Upload size={28} className="mb-4 text-slate-800" /><label className="cursor-pointer">Import JSON<input type="file" className="hidden" accept=".json" onChange={handleImport} /></label></div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
       {activeTab === 'dashboard' && <DashboardView />}
-      {activeTab !== 'dashboard' && (
-        <div className="bg-white rounded-[2.5rem] p-12 border border-slate-200 shadow-sm min-h-[500px] flex flex-col items-center justify-center text-slate-400 space-y-6">
-          <div className="p-8 bg-slate-50 rounded-full">
-            <Folder size={64} className="opacity-20" />
-          </div>
-          <div className="text-center">
-            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-2">กำลังพัฒนาระบบส่วนนี้</h3>
-            <p className="text-sm font-medium">ส่วน "{activeTab}" กำลังอยู่ในระหว่างการรวบรวมข้อมูลและพัฒนาฟีเจอร์</p>
-          </div>
-          <button 
-            onClick={() => setActiveTab('dashboard')}
-            className="px-6 py-3 bg-red-600 text-white rounded-2xl font-bold text-sm shadow-lg shadow-red-200 hover:bg-red-700 transition-all"
-          >
-            กลับหน้าแดชบอร์ด
-          </button>
-        </div>
-      )}
-
-      {/* Drill-down Modal for Asset Categories */}
-      {viewingCategoryDetail && (
-        <Modal title={`รายละเอียดหมวดหมู่: ${viewingCategoryDetail}`} onClose={() => setViewingCategoryDetail(null)}>
-          <div className="space-y-3">
-            {categoryDrillDown.length > 0 ? (
-              categoryDrillDown.map(([location, stats], idx) => (
-                <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                  <div className="flex items-center gap-3">
-                    <LocationIcon locationName={location} category={stats.locCat} />
-                    <div>
-                      <p className="text-sm font-black text-slate-800">{location}</p>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">ผู้ดูแล: {stats.staff}</p>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end">
-                    <span className="text-lg font-black text-blue-600">{stats.count}</span>
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">รายการ</span>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-center py-10 text-slate-400 font-bold uppercase tracking-widest text-xs">ไม่พบข้อมูล</p>
-            )}
-          </div>
-        </Modal>
-      )}
+      {activeTab === 'worklogs' && <WorkLogsView />}
+      {activeTab === 'inspections' && <InspectionsView />}
+      {activeTab === 'repairs' && <UnifiedTicketView type={TicketType.REPAIR} />}
+      {activeTab === 'purchases' && <UnifiedTicketView type={TicketType.PURCHASE} />}
+      {activeTab === 'assets' && <AssetsView />}
+      {activeTab === 'settings' && <SettingsView />}
 
       {/* Lightbox for viewing images */}
       {lightboxData && (
@@ -814,9 +1406,22 @@ const App: React.FC = () => {
           onClose={() => setLightboxData(null)} 
         />
       )}
+
+      {/* Drill-down Modal for Asset Categories */}
+      {viewingCategoryDetail && (
+        <Modal title={`รายละเอียด: ${viewingCategoryDetail}`} onClose={() => setViewingCategoryDetail(null)}>
+          <div className="space-y-3">
+            {categoryDrillDown.map(([location, stats], idx) => (
+              <div key={idx} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl">
+                <span>{location}</span>
+                <span className="font-bold">{stats.count} รายการ</span>
+              </div>
+            ))}
+          </div>
+        </Modal>
+      )}
     </Layout>
   );
 };
 
-// Fix: Added missing default export for App component
 export default App;

@@ -66,7 +66,8 @@ import {
   Calculator,
   LayoutDashboard,
   Database,
-  Info
+  Info,
+  Archive
 } from 'lucide-react';
 
 // --- Types ---
@@ -1511,7 +1512,7 @@ const App: React.FC = () => {
 
         <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden min-h-[400px]">
           {groupedAssets.length === 0 ? (<div className="flex flex-col items-center justify-center py-20 text-slate-400"><Anchor size={64} className="opacity-10 mb-4"/><p>ไม่พบอุปกรณ์</p></div>) : (
-            <div className="overflow-x-auto"><table className="w-full text-left"><thead className="bg-slate-50 border-b border-slate-100"><tr className="text-[10px] font-black text-slate-400"><th className="px-8 py-4">ชื่ออุปกรณ์</th><th className="px-8 py-4 text-center">จำนวน</th><th className="px-8 py-4 text-center">ใช้งาน</th><th className="px-8 py-4 text-center">ชำรุด</th><th className="px-8 py-4 text-right">จัดการ</th></tr></thead><tbody className="divide-y divide-slate-100">
+            <div className="overflow-x-auto"><table className="w-full text-left"><thead className="bg-slate-50 border-b border-slate-100"><tr className="text-[10px] font-black text-slate-400"><th className="px-8 py-4">ชื่ออุปกรณ์</th><th className="px-8 py-4 text-center">จำนวน</th><th className="px-8 py-4 text-center">ใช้งาน</th><th className="px-8 py-4 text-center">ชำรุด</th><th className="px-8 py-4 text-center">สำรอง</th><th className="px-8 py-4 text-right">จัดการ</th></tr></thead><tbody className="divide-y divide-slate-100">
                   {groupedAssets.map(group => (
                     <React.Fragment key={group.name}>
                       <tr className="hover:bg-slate-50 cursor-pointer transition-colors" onClick={() => toggleAssetFolder(group.name)}>
@@ -1519,11 +1520,12 @@ const App: React.FC = () => {
                         <td className="px-8 py-5 text-center"><span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-xl text-xs font-black">{group.total}</span></td>
                         <td className="px-8 py-5 text-center"><span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-black">{group.active}</span></td>
                         <td className="px-8 py-5 text-center"><span className="px-3 py-1 bg-amber-50 text-amber-600 rounded-xl text-xs font-black">{group.maintenance}</span></td>
+                        <td className="px-8 py-5 text-center"><span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-xl text-xs font-black">{group.total - group.active}</span></td>
                         <td className="px-8 py-5 text-right">{expandedAssetNames.has(group.name) ? <ChevronDown size={22} className="text-slate-300" /> : <ChevronRight size={22} className="text-slate-300" />}</td>
                       </tr>
                       {expandedAssetNames.has(group.name) && (
                         <tr>
-                          <td colSpan={5} className="bg-slate-50/50 px-8 py-4 border-b border-slate-100">
+                          <td colSpan={6} className="bg-slate-50/50 px-8 py-4 border-b border-slate-100">
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                               {group.assets.map(asset => (
                                 <div key={asset.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative group flex gap-4">

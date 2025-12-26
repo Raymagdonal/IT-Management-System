@@ -57,9 +57,12 @@ export interface Asset {
   category: string;
   locationCategory: LocationCategory;
   locationName: string;
+  position?: string;
+  description?: string;
   status: 'Active' | 'Maintenance' | 'Retired' | 'Lost';
   lastChecked: string;
   staffName: string;
+  imageUrl?: string;
 }
 
 export interface InspectionImage {

@@ -62,7 +62,8 @@ import {
   Coins,
   Percent,
   Fuel,
-  Home
+  Home,
+  Calculator
 } from 'lucide-react';
 
 // --- Types ---
@@ -1164,18 +1165,25 @@ const App: React.FC = () => {
       setTempImages(prev => prev.filter((_, i) => i !== idx));
     };
 
-    const calculateTotal = (qty: number, price: number, vatInclusive: boolean) => {
-      const base = qty * price;
-      if (vatInclusive) return base;
-      return base + (base * 0.07);
-    };
+    const calculationSummary = useMemo(() => {
+      const subtotal = purchaseQty * purchasePrice;
+      let vat = 0;
+      let grandTotal = 0;
+
+      if (isVatInclusive) {
+        grandTotal = subtotal;
+        vat = subtotal - (subtotal / 1.07);
+      } else {
+        vat = subtotal * 0.07;
+        grandTotal = subtotal + vat;
+      }
+
+      return { subtotal, vat, grandTotal };
+    }, [purchaseQty, purchasePrice, isVatInclusive]);
 
     const handleCreateTicket = (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
       const f = new FormData(e.currentTarget);
-      
-      const qty = type === TicketType.PURCHASE ? Number(f.get('quantity')) : undefined;
-      const price = type === TicketType.PURCHASE ? Number(f.get('price')) : undefined;
       
       addTicket({ 
         type, 
@@ -1187,10 +1195,10 @@ const App: React.FC = () => {
         requesterName: (f.get('requesterName') as string) || "ไม่ระบุชื่อ",
         requesterPosition: (f.get('requesterPosition') as string) || "-",
         companyName: type === TicketType.PURCHASE ? (f.get('companyName') as string) : undefined,
-        quantity: qty,
-        price: price,
+        quantity: purchaseQty || undefined,
+        price: purchasePrice || undefined,
         isVatInclusive: type === TicketType.PURCHASE ? isVatInclusive : undefined,
-        totalPrice: qty && price ? calculateTotal(qty, price, isVatInclusive) : undefined
+        totalPrice: type === TicketType.PURCHASE ? calculationSummary.grandTotal : undefined
       });
       setTempImages([]);
       setPurchaseQty(0);
@@ -1252,9 +1260,12 @@ const App: React.FC = () => {
                              </div>
                              <div className="bg-emerald-50/50 p-2 rounded-xl border border-emerald-100 flex items-center gap-2">
                                 <Coins size={14} className="text-emerald-500 shrink-0" />
-                                <span className="text-[10px] font-black text-emerald-700 truncate uppercase tracking-tight">
-                                  {ticket.totalPrice?.toLocaleString()} บาท
-                                </span>
+                                <div className="flex flex-col">
+                                  <span className="text-[10px] font-black text-emerald-700 uppercase tracking-tight">
+                                    {ticket.totalPrice?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                  </span>
+                                  <span className="text-[8px] font-bold text-emerald-500 uppercase">{ticket.isVatInclusive ? 'Inc VAT' : 'Ex VAT'}</span>
+                                </div>
                              </div>
                           </div>
                         )}
@@ -1306,7 +1317,7 @@ const App: React.FC = () => {
                       <td className={`px-8 ${ticketView === 'compact' ? 'py-1' : 'py-5'} border-r border-slate-300 last:border-r-0 text-slate-500 font-bold`}>{ticket.location}</td>
                       {type === TicketType.PURCHASE && (
                         <td className={`px-8 ${ticketView === 'compact' ? 'py-1' : 'py-5'} border-r border-slate-300 last:border-r-0 font-black text-emerald-600`}>
-                          {ticket.totalPrice?.toLocaleString()}
+                          {ticket.totalPrice?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </td>
                       )}
                       <td className={`px-8 ${ticketView === 'compact' ? 'py-1' : 'py-5'} border-r border-slate-300 last:border-r-0 text-center`}>{ticket.images && ticket.images.length > 0 ? (<div className="flex items-center justify-center cursor-zoom-in" onClick={() => setLightboxData({ images: ticket.images!, index: 0 })}><div className="bg-blue-50 text-blue-600 px-2 py-1 rounded-lg text-[10px] font-black">{ticket.images.length}P</div></div>) : <span className="text-slate-300">-</span>}</td>
@@ -1343,10 +1354,58 @@ const App: React.FC = () => {
             </div>
 
             {type === TicketType.PURCHASE && (
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
-                <input name="companyName" type="text" placeholder="ชื่อร้านค้า / บริษัท" className="md:col-span-2 w-full p-4 bg-white border border-slate-200 rounded-2xl" />
-                <input name="quantity" type="number" placeholder="จำนวน" className="w-full p-4 bg-white border border-slate-200 rounded-2xl" onChange={(e) => setPurchaseQty(Number(e.target.value))} />
-                <input name="price" type="number" placeholder="ราคาต่อหน่วย" className="w-full p-4 bg-white border border-slate-200 rounded-2xl" onChange={(e) => setPurchasePrice(Number(e.target.value))} />
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                  <div className="md:col-span-2 space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">ร้านค้า / บริษัท</label>
+                    <input name="companyName" type="text" placeholder="ชื่อร้านค้า / บริษัท" className="w-full p-4 bg-white border border-slate-200 rounded-2xl" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">จำนวน</label>
+                    <input name="quantity" type="number" placeholder="0" className="w-full p-4 bg-white border border-slate-200 rounded-2xl" onChange={(e) => setPurchaseQty(Number(e.target.value))} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">ราคาต่อหน่วย</label>
+                    <input name="price" type="number" placeholder="0.00" className="w-full p-4 bg-white border border-slate-200 rounded-2xl" onChange={(e) => setPurchasePrice(Number(e.target.value))} />
+                  </div>
+                </div>
+
+                <div className="flex flex-col md:flex-row gap-6 items-start md:items-center p-6 bg-blue-50/50 rounded-3xl border border-blue-100">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[10px] font-black text-blue-500 uppercase tracking-widest">การคำนวณภาษี (VAT 7%)</label>
+                    <div className="flex bg-white p-1 rounded-2xl border border-blue-200 w-fit">
+                      <button 
+                        type="button" 
+                        onClick={() => setIsVatInclusive(true)}
+                        className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${isVatInclusive ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-400 hover:text-blue-600'}`}
+                      >
+                        รวม VAT แล้ว
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => setIsVatInclusive(false)}
+                        className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${!isVatInclusive ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-400 hover:text-blue-600'}`}
+                      >
+                        แยก VAT ต่างหาก
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-6 w-full">
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">ราคารวม (Subtotal)</span>
+                      <p className="text-lg font-black text-slate-800">{calculationSummary.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">ภาษี (VAT 7%)</span>
+                      <p className="text-lg font-black text-blue-600">{calculationSummary.vat.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                    </div>
+                    <div className="space-y-1 bg-white p-3 rounded-2xl border border-blue-100">
+                      <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">ยอดสุทธิ (Grand Total)</span>
+                      <p className="text-xl font-black text-emerald-600">{calculationSummary.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -1455,6 +1514,16 @@ const App: React.FC = () => {
           <form className="space-y-4" onSubmit={(e) => { 
             e.preventDefault(); 
             const f = new FormData(e.currentTarget);
+            
+            let finalPrice = editingTicket.totalPrice;
+            if (editingTicket.type === TicketType.PURCHASE) {
+              const qty = Number(f.get('quantity'));
+              const uprice = Number(f.get('price'));
+              const isInc = f.get('vatType') === 'inclusive';
+              const base = qty * uprice;
+              finalPrice = isInc ? base : base + (base * 0.07);
+            }
+
             updateTicket({
               ...editingTicket,
               subject: f.get('subject') as string,
@@ -1463,6 +1532,11 @@ const App: React.FC = () => {
               status: f.get('status') as TaskStatus,
               requesterName: f.get('requesterName') as string,
               requesterPosition: f.get('requesterPosition') as string,
+              companyName: editingTicket.type === TicketType.PURCHASE ? (f.get('companyName') as string) : undefined,
+              quantity: editingTicket.type === TicketType.PURCHASE ? Number(f.get('quantity')) : undefined,
+              price: editingTicket.type === TicketType.PURCHASE ? Number(f.get('price')) : undefined,
+              isVatInclusive: editingTicket.type === TicketType.PURCHASE ? f.get('vatType') === 'inclusive' : undefined,
+              totalPrice: finalPrice
             });
           }}>
             <div className="space-y-1">
@@ -1485,6 +1559,32 @@ const App: React.FC = () => {
                  </select>
                </div>
             </div>
+
+            {editingTicket.type === TicketType.PURCHASE && (
+              <div className="space-y-4 bg-slate-50 p-4 rounded-3xl border border-slate-100">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">ร้านค้า / บริษัท</label>
+                  <input name="companyName" type="text" className="w-full p-3 border border-slate-200 rounded-2xl bg-white text-slate-900 font-bold shadow-sm" defaultValue={editingTicket.companyName} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">จำนวน</label>
+                    <input name="quantity" type="number" className="w-full p-3 border border-slate-200 rounded-2xl bg-white text-slate-900 font-bold shadow-sm" defaultValue={editingTicket.quantity} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">ราคาต่อหน่วย</label>
+                    <input name="price" type="number" className="w-full p-3 border border-slate-200 rounded-2xl bg-white text-slate-900 font-bold shadow-sm" defaultValue={editingTicket.price} />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">ประเภทภาษี</label>
+                  <select name="vatType" className="w-full p-3 border border-slate-200 rounded-2xl bg-white text-slate-900 font-bold shadow-sm" defaultValue={editingTicket.isVatInclusive ? 'inclusive' : 'exclusive'}>
+                    <option value="inclusive">รวม VAT แล้ว</option>
+                    <option value="exclusive">แยก VAT 7%</option>
+                  </select>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-1">
               <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">รายละเอียด</label>

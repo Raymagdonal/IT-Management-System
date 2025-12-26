@@ -1145,11 +1145,18 @@ const App: React.FC = () => {
     const [purchasePrice, setPurchasePrice] = useState<number>(0);
     const [isVatInclusive, setIsVatInclusive] = useState<boolean>(true);
 
-    const handleAddImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) {
-        const base64 = await fileToBase64(file);
-        setTempImages(prev => [...prev, base64]);
+    const handleAddImages = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (files) {
+        const newImages: string[] = [];
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          if (file.type.match('image/jp.*')) {
+            const base64 = await fileToBase64(file);
+            newImages.push(base64);
+          }
+        }
+        setTempImages(prev => [...prev, ...newImages]);
       }
     };
 
@@ -1221,19 +1228,21 @@ const App: React.FC = () => {
                         <div className="w-full h-56 overflow-hidden relative border-b border-slate-50 cursor-zoom-in group/img" onClick={() => setLightboxData({ images: ticket.images!, index: 0 })}>
                           <img src={ticket.images[0]} className="w-full h-full object-cover transition-transform duration-700 group-hover/img:scale-110" />
                           <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
-                             <Maximize2 className="text-white drop-shadow-lg" size={32} />
+                             <div className="bg-white/20 backdrop-blur-md px-4 py-2 rounded-full border border-white/30 text-white font-black text-sm uppercase tracking-widest">
+                               +{ticket.images.length} Photos
+                             </div>
                           </div>
                         </div>
                       ) : (<div className="w-full h-56 bg-slate-50 flex items-center justify-center text-slate-200"><ImageIcon size={48} strokeWidth={1} /></div>)}
                       <div className="p-7 flex-1 flex flex-col">
                         <div className="flex justify-between items-start mb-5">
                           <span className={`text-sm font-black px-4 py-1.5 rounded-full shadow-sm uppercase tracking-tight ${ticket.type === TicketType.REPAIR ? 'bg-orange-100 text-orange-700 shadow-orange-100' : 'bg-blue-100 text-blue-700 shadow-blue-100'}`}>{ticket.type === TicketType.REPAIR ? 'แจ้งซ่อม' : 'จัดซื้อ'}</span>
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => setEditingTicket(ticket)} className="p-2 hover:bg-slate-50 rounded-xl text-blue-500 transition-colors"><Edit2 size={18}/></button>
+                          <div className="flex gap-1">
+                            <button onClick={() => setEditingTicket(ticket)} className="p-2 hover:bg-slate-50 rounded-xl text-blue-500 transition-colors" title="แก้ไขข้อมูล"><Edit2 size={18}/></button>
                             <LongPressDeleteButton onDelete={() => deleteTicket(ticket.id)} size={18} />
                           </div>
                         </div>
-                        <h4 className="text-xl font-black text-slate-900 mb-3 leading-tight uppercase tracking-tight">{ticket.subject}</h4>
+                        <h4 className="text-xl font-black text-slate-900 mb-3 leading-tight uppercase tracking-tight cursor-pointer hover:text-blue-600 transition-colors" onClick={() => setEditingTicket(ticket)}>{ticket.subject}</h4>
                         
                         {ticket.type === TicketType.PURCHASE && (
                           <div className="grid grid-cols-2 gap-2 mb-4">
@@ -1292,7 +1301,7 @@ const App: React.FC = () => {
                 {filteredList.map(ticket => (
                     <tr key={ticket.id} className={`hover:bg-slate-50 transition-colors ${ticketView === 'compact' ? 'text-xs' : 'text-sm'}`}>
                       <td className={`px-8 ${ticketView === 'compact' ? 'py-1' : 'py-5'} border-r border-slate-300 last:border-r-0 truncate max-w-[200px]`}>
-                        <div className="font-black text-slate-900">{ticket.subject}</div>
+                        <div className="font-black text-slate-900 cursor-pointer hover:text-blue-600" onClick={() => setEditingTicket(ticket)}>{ticket.subject}</div>
                       </td>
                       <td className={`px-8 ${ticketView === 'compact' ? 'py-1' : 'py-5'} border-r border-slate-300 last:border-r-0 text-slate-500 font-bold`}>{ticket.location}</td>
                       {type === TicketType.PURCHASE && (
@@ -1300,7 +1309,7 @@ const App: React.FC = () => {
                           {ticket.totalPrice?.toLocaleString()}
                         </td>
                       )}
-                      <td className={`px-8 ${ticketView === 'compact' ? 'py-1' : 'py-5'} border-r border-slate-300 last:border-r-0 text-center`}>{ticket.images && ticket.images.length > 0 ? (<div className="flex items-center justify-center cursor-zoom-in" onClick={() => setLightboxData({ images: ticket.images!, index: 0 })}><ImageIcon size={18} className="text-blue-500" /></div>) : <span className="text-slate-300">-</span>}</td>
+                      <td className={`px-8 ${ticketView === 'compact' ? 'py-1' : 'py-5'} border-r border-slate-300 last:border-r-0 text-center`}>{ticket.images && ticket.images.length > 0 ? (<div className="flex items-center justify-center cursor-zoom-in" onClick={() => setLightboxData({ images: ticket.images!, index: 0 })}><div className="bg-blue-50 text-blue-600 px-2 py-1 rounded-lg text-[10px] font-black">{ticket.images.length}P</div></div>) : <span className="text-slate-300">-</span>}</td>
                       <td className={`px-8 ${ticketView === 'compact' ? 'py-1' : 'py-5'} border-r border-slate-300 last:border-r-0`}>
                         <span className="text-[10px] font-black">{translateStatus(ticket.status)}</span>
                       </td>
@@ -1313,22 +1322,64 @@ const App: React.FC = () => {
         </div>
 
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm mt-8">
-          <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2">
+          <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2 uppercase tracking-tight">
             {type === TicketType.REPAIR ? <Wrench className="text-orange-500" size={20} /> : <ShoppingCart className="text-blue-600" size={20} />}
-            ลงบันทึกใหม่
+            ลงบันทึก{type === TicketType.REPAIR ? 'แจ้งซ่อม' : 'จัดซื้อ'}ใหม่
           </h3>
           <form className="space-y-6" onSubmit={handleCreateTicket}>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <input name="subject" type="text" placeholder="หัวข้อ" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
-              <input name="location" type="text" placeholder="สถานที่" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl" />
-              <select name="status" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold">
+              <input name="subject" type="text" placeholder="หัวข้อการแจ้ง" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none" required />
+              <input name="location" type="text" placeholder="สถานที่ / เรือลำที่" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none" required />
+              <select name="status" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none">
                  <option value={TaskStatus.PENDING}>รอดำเนินการ</option>
                  <option value={TaskStatus.IN_PROGRESS}>กำลังทำ</option>
+                 <option value={TaskStatus.WAITING_PURCHASE}>รอจัดซื้อ</option>
               </select>
             </div>
-            <textarea name="details" placeholder="รายละเอียด" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl h-24" />
-            <div className="flex justify-end">
-              <button type="submit" className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold">บันทึก</button>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <input name="requesterName" type="text" placeholder="ชื่อผู้แจ้ง" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
+              <input name="requesterPosition" type="text" placeholder="ตำแหน่งผู้แจ้ง" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
+            </div>
+
+            {type === TicketType.PURCHASE && (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                <input name="companyName" type="text" placeholder="ชื่อร้านค้า / บริษัท" className="md:col-span-2 w-full p-4 bg-white border border-slate-200 rounded-2xl" />
+                <input name="quantity" type="number" placeholder="จำนวน" className="w-full p-4 bg-white border border-slate-200 rounded-2xl" onChange={(e) => setPurchaseQty(Number(e.target.value))} />
+                <input name="price" type="number" placeholder="ราคาต่อหน่วย" className="w-full p-4 bg-white border border-slate-200 rounded-2xl" onChange={(e) => setPurchasePrice(Number(e.target.value))} />
+              </div>
+            )}
+
+            <textarea name="details" placeholder="ระบุรายละเอียดอุปกรณ์ที่ขัดข้อง หรือสาเหตุที่ต้องการแจ้ง..." className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl h-32 focus:ring-2 focus:ring-blue-500 outline-none font-medium" required />
+            
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  <ImageIcon size={14} className="text-blue-500" /> อัปโหลดรูปภาพ (.jpg)
+                </label>
+                <span className="text-[10px] font-black text-slate-300 uppercase">เลือกได้มากกว่า 1 รูป</span>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <label className="aspect-square bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem] flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all group shadow-sm">
+                  <Plus size={32} className="text-slate-300 group-hover:text-blue-500 group-hover:scale-110 transition-all" />
+                  <span className="text-[9px] font-black text-slate-300 mt-2 uppercase">Add Photos</span>
+                  <input type="file" multiple accept="image/jpeg" className="hidden" onChange={handleAddImages} />
+                </label>
+                {tempImages.map((img, idx) => (
+                  <div key={idx} className="aspect-square bg-slate-100 rounded-[2rem] overflow-hidden relative group shadow-md border border-white">
+                    <img src={img} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                    <button type="button" onClick={() => handleRemoveImage(idx)} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity border-2 border-white">
+                      <X size={12} strokeWidth={4} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-6 border-t border-slate-50 flex justify-end">
+              <button type="submit" className="bg-gradient-to-br from-blue-600 to-blue-500 text-white px-12 py-4 rounded-[1.5rem] font-black text-sm uppercase tracking-widest shadow-xl shadow-blue-500/30 hover:scale-105 active:scale-95 transition-all">
+                บันทึก{type === TicketType.REPAIR ? 'แจ้งซ่อม' : 'คำขอจัดซื้อ'}
+              </button>
             </div>
           </form>
         </div>
@@ -1398,6 +1449,89 @@ const App: React.FC = () => {
       {activeTab === 'assets' && <AssetsView />}
       {activeTab === 'settings' && <SettingsView />}
 
+      {/* Modal แก้ไข Ticket (ซ่อม/จัดซื้อ) */}
+      {editingTicket && (
+        <Modal title={`แก้ไขรายการ${editingTicket.type === TicketType.REPAIR ? 'แจ้งซ่อม' : 'คำขอจัดซื้อ'}`} onClose={() => setEditingTicket(null)}>
+          <form className="space-y-4" onSubmit={(e) => { 
+            e.preventDefault(); 
+            const f = new FormData(e.currentTarget);
+            updateTicket({
+              ...editingTicket,
+              subject: f.get('subject') as string,
+              details: f.get('details') as string,
+              location: f.get('location') as string,
+              status: f.get('status') as TaskStatus,
+              requesterName: f.get('requesterName') as string,
+              requesterPosition: f.get('requesterPosition') as string,
+            });
+          }}>
+            <div className="space-y-1">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">หัวข้อการแจ้ง</label>
+              <input name="subject" type="text" className="w-full p-3 border border-slate-200 rounded-2xl bg-white text-slate-900 font-black shadow-sm" defaultValue={editingTicket.subject} required />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+               <div className="space-y-1">
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">สถานที่ / เรือ</label>
+                 <input name="location" type="text" className="w-full p-3 border border-slate-200 rounded-2xl bg-white text-slate-900 font-bold shadow-sm" defaultValue={editingTicket.location} />
+               </div>
+               <div className="space-y-1">
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">สถานะ</label>
+                 <select name="status" className="w-full p-3 border border-slate-200 rounded-2xl bg-white text-slate-900 font-black shadow-sm" defaultValue={editingTicket.status}>
+                   <option value={TaskStatus.PENDING}>รอดำเนินการ</option>
+                   <option value={TaskStatus.IN_PROGRESS}>กำลังทำ</option>
+                   <option value={TaskStatus.WAITING_PURCHASE}>รอจัดซื้อ</option>
+                   <option value={TaskStatus.COMPLETED}>เสร็จสิ้น</option>
+                 </select>
+               </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">รายละเอียด</label>
+              <textarea name="details" className="w-full p-3 border border-slate-200 rounded-2xl bg-white text-slate-900 h-32 shadow-sm font-medium" defaultValue={editingTicket.details} />
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">จัดการรูปภาพ ({editingTicket.images?.length || 0})</label>
+              <div className="grid grid-cols-4 gap-2">
+                {editingTicket.images?.map((img, i) => (
+                  <div key={i} className="aspect-square rounded-xl overflow-hidden relative border border-slate-100 shadow-sm group">
+                    <img src={img} className="w-full h-full object-cover" />
+                    <button type="button" onClick={() => {
+                      const newImages = editingTicket.images?.filter((_, idx) => idx !== i);
+                      setEditingTicket({...editingTicket, images: newImages});
+                    }} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                      <X size={10} strokeWidth={4} />
+                    </button>
+                  </div>
+                ))}
+                <label className="aspect-square bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-blue-50 hover:border-blue-400 transition-all">
+                   <Plus size={16} className="text-slate-400" />
+                   <input type="file" multiple accept="image/jpeg" className="hidden" onChange={async (e) => {
+                     const files = e.target.files;
+                     if (files) {
+                       const newImages = [...(editingTicket.images || [])];
+                       for (let i = 0; i < files.length; i++) {
+                         if (files[i].type.match('image/jp.*')) {
+                           const base64 = await fileToBase64(files[i]);
+                           newImages.push(base64);
+                         }
+                       }
+                       setEditingTicket({...editingTicket, images: newImages});
+                     }
+                   }} />
+                </label>
+              </div>
+            </div>
+
+            <div className="flex gap-4 pt-4 border-t border-slate-50">
+              <button type="button" onClick={() => setEditingTicket(null)} className="flex-1 py-3 bg-slate-100 rounded-2xl font-black text-slate-500 uppercase tracking-widest">ยกเลิก</button>
+              <button type="submit" className="flex-1 py-3 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-blue-500/20">บันทึกข้อมูล</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
       {/* Lightbox for viewing images */}
       {lightboxData && (
         <ImageLightbox 
@@ -1413,8 +1547,11 @@ const App: React.FC = () => {
           <div className="space-y-3">
             {categoryDrillDown.map(([location, stats], idx) => (
               <div key={idx} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl">
-                <span>{location}</span>
-                <span className="font-bold">{stats.count} รายการ</span>
+                <div className="flex items-center gap-3">
+                  <LocationIcon locationName={location} category={stats.locCat} />
+                  <span className="font-black text-slate-800">{location}</span>
+                </div>
+                <span className="font-black text-blue-600">{stats.count}</span>
               </div>
             ))}
           </div>

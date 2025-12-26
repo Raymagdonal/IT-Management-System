@@ -63,7 +63,10 @@ import {
   Percent,
   Fuel,
   Home,
-  Calculator
+  Calculator,
+  LayoutDashboard,
+  Database,
+  Info
 } from 'lucide-react';
 
 // --- Types ---
@@ -458,7 +461,7 @@ const App: React.FC = () => {
       const aDate = new Date(asset.lastChecked);
       const aMonth = (aDate.getMonth() + 1).toString().padStart(2, '0');
       const aYear = aDate.getFullYear().toString();
-      const inSearch = asset.name?.toLowerCase().includes(assetFilters.search.toLowerCase()) || asset.serialNumber?.toLowerCase().includes(assetFilters.search.toLowerCase()) || asset.category?.toLowerCase().includes(assetFilters.search.toLowerCase()) || asset.locationName?.toLowerCase().includes(assetFilters.search.toLowerCase()) || asset.staffName?.toLowerCase().includes(assetFilters.search.toLowerCase());
+      const inSearch = (asset.name?.toLowerCase() || '').includes(assetFilters.search.toLowerCase()) || (asset.serialNumber?.toLowerCase() || '').includes(assetFilters.search.toLowerCase()) || (asset.category?.toLowerCase() || '').includes(assetFilters.search.toLowerCase()) || (asset.locationName?.toLowerCase() || '').includes(assetFilters.search.toLowerCase()) || (asset.staffName?.toLowerCase() || '').includes(assetFilters.search.toLowerCase()) || (asset.position?.toLowerCase() || '').includes(assetFilters.search.toLowerCase());
       const inMonthRange = aMonth >= assetFilters.startMonth && aMonth <= assetFilters.endMonth;
       const inYear = aYear === assetFilters.year;
       return inSearch && inMonthRange && inYear;
@@ -1244,7 +1247,7 @@ const App: React.FC = () => {
                       ) : (<div className="w-full h-56 bg-slate-50 flex items-center justify-center text-slate-200"><ImageIcon size={48} strokeWidth={1} /></div>)}
                       <div className="p-7 flex-1 flex flex-col">
                         <div className="flex justify-between items-start mb-5">
-                          <span className={`text-sm font-black px-4 py-1.5 rounded-full shadow-sm uppercase tracking-tight ${ticket.type === TicketType.REPAIR ? 'bg-orange-100 text-orange-700 shadow-orange-100' : 'bg-blue-100 text-blue-700 shadow-blue-100'}`}>{ticket.type === TicketType.REPAIR ? 'แจ้งซ่อม' : 'จัดซื้อ'}</span>
+                          <span className={`text-sm font-black px-4 py-1.5 rounded-full shadow-sm uppercase tracking-tight ${ticket.type === TicketType.REPAIR ? 'bg-orange-100 text-orange-700 shadow-orange-100' : 'bg-blue-100 text-blue-700 shadow-blue-100'}`}>{type === TicketType.REPAIR ? 'แจ้งซ่อม' : 'จัดซื้อ'}</span>
                           <div className="flex gap-1">
                             <button onClick={() => setEditingTicket(ticket)} className="p-2 hover:bg-slate-50 rounded-xl text-blue-500 transition-colors" title="แก้ไขข้อมูล"><Edit2 size={18}/></button>
                             <LongPressDeleteButton onDelete={() => deleteTicket(ticket.id)} size={18} />
@@ -1448,6 +1451,27 @@ const App: React.FC = () => {
 
   const AssetsView = () => {
     const glowInputStyle = "p-3 border-2 border-slate-200 rounded-2xl bg-white text-slate-900 shadow-sm transition-all duration-300 focus:outline-none focus:border-blue-500 focus:shadow-[0_0_15px_rgba(59,130,246,0.4)]";
+    const [tempAssetImage, setTempAssetImage] = useState<string | null>(null);
+
+    const assetSummary = useMemo(() => {
+      let stock = 0;
+      let broken = 0;
+      let lost = 0;
+      data.assets.forEach(a => {
+        if (a.status === 'Active') stock++;
+        if (a.status === 'Maintenance') broken++;
+        if (a.status === 'Lost') lost++;
+      });
+      return { stock, broken, lost };
+    }, [data.assets]);
+
+    const handleAssetImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file && file.type.match('image/jp.*')) {
+        const base64 = await fileToBase64(file);
+        setTempAssetImage(base64);
+      }
+    };
 
     return (
       <div className="space-y-6 text-slate-900">
@@ -1456,30 +1480,198 @@ const App: React.FC = () => {
             <h3 className="text-lg font-bold text-slate-800">ทะเบียนคลังอุปกรณ์ไอที</h3>
             <ViewSwitcher activeMode={assetView} onChange={setAssetView} />
           </div>
-          <SearchFilterBar filters={assetFilters} setFilters={setAssetFilters} placeholder="ค้นหาอุปกรณ์..." />
+          
+          {/* Global Summary Bar */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-between group hover:shadow-md transition-all">
+              <div>
+                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">สต็อกพร้อมใช้งาน</p>
+                <h4 className="text-3xl font-black text-emerald-700">{assetSummary.stock}</h4>
+              </div>
+              <div className="p-3 bg-white rounded-xl text-emerald-500 shadow-sm"><Box size={24}/></div>
+            </div>
+            <div className="p-5 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-between group hover:shadow-md transition-all">
+              <div>
+                <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">อุปกรณ์ที่ชำรุด</p>
+                <h4 className="text-3xl font-black text-amber-700">{assetSummary.broken}</h4>
+              </div>
+              <div className="p-3 bg-white rounded-xl text-amber-500 shadow-sm"><Hammer size={24}/></div>
+            </div>
+            <div className="p-5 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-between group hover:shadow-md transition-all">
+              <div>
+                <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-1">อุปกรณ์สูญหาย</p>
+                <h4 className="text-3xl font-black text-slate-700">{assetSummary.lost}</h4>
+              </div>
+              <div className="p-3 bg-white rounded-xl text-slate-500 shadow-sm"><EyeOff size={24}/></div>
+            </div>
+          </div>
+
+          <SearchFilterBar filters={assetFilters} setFilters={setAssetFilters} placeholder="ค้นหาอุปกรณ์ หรือสถานที่..." />
         </div>
 
         <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden min-h-[400px]">
           {groupedAssets.length === 0 ? (<div className="flex flex-col items-center justify-center py-20 text-slate-400"><Anchor size={64} className="opacity-10 mb-4"/><p>ไม่พบอุปกรณ์</p></div>) : (
-            <div className="overflow-x-auto"><table className="w-full text-left"><thead className="bg-slate-50 border-b border-slate-100"><tr className="text-[10px] font-black text-slate-400"><th>ชื่ออุปกรณ์</th><th>จำนวน</th><th>ใช้งาน</th><th>จัดการ</th></tr></thead><tbody className="divide-y divide-slate-100">
+            <div className="overflow-x-auto"><table className="w-full text-left"><thead className="bg-slate-50 border-b border-slate-100"><tr className="text-[10px] font-black text-slate-400"><th className="px-8 py-4">ชื่ออุปกรณ์</th><th className="px-8 py-4 text-center">จำนวน</th><th className="px-8 py-4 text-center">ใช้งาน</th><th className="px-8 py-4 text-center">ชำรุด</th><th className="px-8 py-4 text-right">จัดการ</th></tr></thead><tbody className="divide-y divide-slate-100">
                   {groupedAssets.map(group => (
-                    <tr key={group.name} className="hover:bg-slate-50 cursor-pointer transition-colors" onClick={() => toggleAssetFolder(group.name)}>
-                      <td className="px-8 py-5 border-r border-slate-200 last:border-r-0"><div className="flex items-center gap-4"><div className={`p-2.5 rounded-2xl shadow-sm transition-all duration-300 ${expandedAssetNames.has(group.name) ? 'bg-blue-600 text-white scale-110 shadow-blue-500/30' : 'bg-slate-100 text-slate-400'}`}><Folder size={20} fill={expandedAssetNames.has(group.name) ? 'currentColor' : 'none'} /></div><div className="flex flex-col"><span className="font-black text-slate-800 tracking-tight">{group.name}</span></div></div></td>
-                      <td className="px-8 py-5 text-center"><span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-xl text-xs font-black">{group.total}</span></td>
-                      <td className="px-8 py-5 text-center"><span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-black">{group.active}</span></td>
-                      <td className="px-8 py-5 text-right">{expandedAssetNames.has(group.name) ? <ChevronDown size={22} className="text-slate-300" /> : <ChevronRight size={22} className="text-slate-300" />}</td>
-                    </tr>
+                    <React.Fragment key={group.name}>
+                      <tr className="hover:bg-slate-50 cursor-pointer transition-colors" onClick={() => toggleAssetFolder(group.name)}>
+                        <td className="px-8 py-5 border-r border-slate-200 last:border-r-0"><div className="flex items-center gap-4"><div className={`p-2.5 rounded-2xl shadow-sm transition-all duration-300 ${expandedAssetNames.has(group.name) ? 'bg-blue-600 text-white scale-110 shadow-blue-500/30' : 'bg-slate-100 text-slate-400'}`}><Folder size={20} fill={expandedAssetNames.has(group.name) ? 'currentColor' : 'none'} /></div><div className="flex flex-col"><span className="font-black text-slate-800 tracking-tight">{group.name}</span></div></div></td>
+                        <td className="px-8 py-5 text-center"><span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-xl text-xs font-black">{group.total}</span></td>
+                        <td className="px-8 py-5 text-center"><span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-black">{group.active}</span></td>
+                        <td className="px-8 py-5 text-center"><span className="px-3 py-1 bg-amber-50 text-amber-600 rounded-xl text-xs font-black">{group.maintenance}</span></td>
+                        <td className="px-8 py-5 text-right">{expandedAssetNames.has(group.name) ? <ChevronDown size={22} className="text-slate-300" /> : <ChevronRight size={22} className="text-slate-300" />}</td>
+                      </tr>
+                      {expandedAssetNames.has(group.name) && (
+                        <tr>
+                          <td colSpan={5} className="bg-slate-50/50 px-8 py-4 border-b border-slate-100">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                              {group.assets.map(asset => (
+                                <div key={asset.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative group flex gap-4">
+                                  {asset.imageUrl && (
+                                    <div className="w-16 h-16 rounded-xl overflow-hidden border border-slate-100 flex-shrink-0 cursor-zoom-in" onClick={() => setLightboxData({ images: [asset.imageUrl!], index: 0 })}>
+                                      <img src={asset.imageUrl} className="w-full h-full object-cover" alt={asset.name} />
+                                    </div>
+                                  )}
+                                  <div className="flex-1 space-y-1 min-w-0">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <span className="text-[10px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded-lg truncate">{asset.serialNumber}</span>
+                                      <div className="flex items-center gap-2">
+                                        <button onClick={() => setEditingAsset(asset)} className="text-slate-400 hover:text-blue-500"><Edit2 size={12}/></button>
+                                        <LongPressDeleteButton onDelete={() => deleteAsset(asset.id)} size={12} />
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+                                      <MapPin size={12} className="text-slate-400"/>
+                                      <span className="truncate">{asset.locationName}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-[11px] text-slate-500 font-medium">
+                                      <User size={12} className="text-slate-300"/>
+                                      <span className="truncate">{asset.staffName}</span>
+                                    </div>
+                                    {asset.position && (
+                                      <div className="flex items-center gap-2 text-[11px] text-slate-500 font-medium">
+                                        <LayoutDashboard size={12} className="text-slate-300"/>
+                                        <span className="truncate">{asset.position}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   ))}
             </tbody></table></div>
           )}
         </div>
 
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mt-8">
-          <h3 className="text-lg font-bold text-slate-800 mb-6">เพิ่มอุปกรณ์</h3>
-          <form className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4" onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget); addAsset({ name: (f.get('name') as string) || "ไม่ระบุชื่อ", serialNumber: (f.get('serial') as string) || "N/A", category: (f.get('category') as string) || "ทั่วไป", locationCategory: f.get('locCat') as LocationCategory, locationName: (f.get('locName') as string) || "ไม่ระบุสถานที่", staffName: (f.get('staffName') as string) || "ไม่ระบุ", status: 'Active', lastChecked: new Date().toISOString().split('T')[0] }); e.currentTarget.reset(); }}>
-            <input name="name" type="text" placeholder="ชื่อ" className={glowInputStyle} />
-            <input name="serial" type="text" placeholder="S/N" className={glowInputStyle} />
-            <button type="submit" className="bg-blue-600 text-white p-3 rounded-2xl">เพิ่ม</button>
+        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm mt-8">
+          <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2 uppercase tracking-tight">
+            <Plus className="text-blue-600" size={20}/>
+            เพิ่มข้อมูลอุปกรณ์ใหม่
+          </h3>
+          <form className="space-y-6" onSubmit={(e) => { 
+            e.preventDefault(); 
+            const f = new FormData(e.currentTarget); 
+            addAsset({ 
+              name: (f.get('name') as string) || "ไม่ระบุชื่อ", 
+              serialNumber: (f.get('serial') as string) || "N/A", 
+              category: (f.get('category') as string) || "ทั่วไป", 
+              locationCategory: f.get('locCat') as LocationCategory, 
+              locationName: (f.get('locName') as string) || "ไม่ระบุสถานที่", 
+              position: (f.get('position') as string) || "",
+              description: (f.get('description') as string) || "",
+              staffName: (f.get('staffName') as string) || PERMANENT_STAFF_NAME, 
+              status: 'Active', 
+              lastChecked: new Date().toISOString().split('T')[0],
+              imageUrl: tempAssetImage || undefined
+            }); 
+            setTempAssetImage(null);
+            e.currentTarget.reset(); 
+          }}>
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              <div className="lg:col-span-3 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">ชื่ออุปกรณ์</label>
+                    <input name="name" type="text" placeholder="ระบุชื่ออุปกรณ์..." className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold focus:ring-2 focus:ring-blue-500 outline-none" required />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">S/N (Serial Number)</label>
+                    <input name="serial" type="text" placeholder="ระบุเลขซีเรียล..." className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold focus:ring-2 focus:ring-blue-500 outline-none" required />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">หมวดหมู่</label>
+                    <input name="category" type="text" placeholder="เช่น เน็ตเวิร์ค, คอมพิวเตอร์..." className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold focus:ring-2 focus:ring-blue-500 outline-none" required />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">ประเภทสถานที่</label>
+                    <select name="locCat" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-slate-700 outline-none focus:ring-2 focus:ring-blue-500">
+                      <option value={LocationCategory.SHIP}>บนเรือ</option>
+                      <option value={LocationCategory.OFFICE}>สำนักงาน</option>
+                      <option value={LocationCategory.PORT}>ท่าเรือ</option>
+                      <option value={LocationCategory.SHIPYARD}>อู่เรือ</option>
+                      <option value={LocationCategory.WAT_RAJSINGKORN}>วัดราชสิงขร</option>
+                      <option value={LocationCategory.GAS_STATION}>ปั้มน้ำมัน</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">ชื่อสถานที่</label>
+                    <input name="locName" type="text" placeholder="เช่น เรือด่วนลำที่ 101, ห้องไอที..." className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold focus:ring-2 focus:ring-blue-500 outline-none" required />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">ตำแหน่ง (Position)</label>
+                    <input name="position" type="text" placeholder="เช่น โต๊ะทำงาน, ชั้นวาง, เสาเรือ..." className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold focus:ring-2 focus:ring-blue-500 outline-none" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">ชื่อพนักงานที่รับผิดชอบ</label>
+                    <input name="staffName" type="text" placeholder="ระบุชื่อพนักงาน..." className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold focus:ring-2 focus:ring-blue-500 outline-none" defaultValue={PERMANENT_STAFF_NAME} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">รายละเอียดเพิ่มเติม</label>
+                    <input name="description" placeholder="ระบุสเปค หรือจุดสังเกต..." className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-medium focus:ring-2 focus:ring-blue-500 outline-none" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Image Upload Area */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">รูปถ่ายอุปกรณ์ (.jpg)</label>
+                <label className="block w-full aspect-square bg-slate-50 border-2 border-dashed border-slate-100 rounded-[2.5rem] overflow-hidden cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all relative group">
+                  {tempAssetImage ? (
+                    <>
+                      <img src={tempAssetImage} className="w-full h-full object-cover" alt="Preview" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <Camera size={32} className="text-white" />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-200">
+                      <ImageIcon size={48} strokeWidth={1} />
+                      <span className="text-[10px] font-black mt-2 uppercase tracking-widest">Upload JPG</span>
+                    </div>
+                  )}
+                  <input type="file" accept="image/jpeg" className="hidden" onChange={handleAssetImageUpload} />
+                </label>
+                {tempAssetImage && (
+                  <button type="button" onClick={() => setTempAssetImage(null)} className="text-[10px] font-black text-red-500 uppercase tracking-widest w-full text-center hover:underline mt-2">ลบรูปภาพ</button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-4 border-t border-slate-50">
+              <button type="submit" className="bg-gradient-to-br from-blue-600 to-blue-500 text-white px-16 py-4 rounded-[1.75rem] font-black text-sm uppercase tracking-[0.2em] shadow-2xl shadow-blue-500/30 hover:scale-105 active:scale-95 transition-all">
+                บันทึกอุปกรณ์เข้าคลัง
+              </button>
+            </div>
           </form>
         </div>
       </div>
@@ -1487,12 +1679,65 @@ const App: React.FC = () => {
   };
 
   const SettingsView = () => (
-    <div className="max-w-2xl space-y-8 text-slate-900">
-      <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col gap-6">
-        <div><h3 className="text-xl font-bold text-slate-900 mb-2">จัดการข้อมูล</h3></div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <button className="p-6 rounded-3xl bg-blue-50 border border-blue-100 flex flex-col items-center" onClick={handleExport}><Download size={28} className="mb-4 text-blue-600" /><span>Export JSON</span></button>
-          <div className="p-6 rounded-3xl bg-slate-50 border border-slate-200 flex flex-col items-center"><Upload size={28} className="mb-4 text-slate-800" /><label className="cursor-pointer">Import JSON<input type="file" className="hidden" accept=".json" onChange={handleImport} /></label></div>
+    <div className="max-w-4xl space-y-10 text-slate-900">
+      <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col gap-10">
+        <div className="flex items-center gap-4 border-b border-slate-50 pb-6">
+          <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl"><Database size={24} /></div>
+          <div>
+            <h3 className="text-2xl font-black text-slate-900 tracking-tight">จัดการและสำรองข้อมูล</h3>
+            <p className="text-sm text-slate-400 font-medium">Export ข้อมูลเพื่อเก็บรักษา หรือ Import ข้อมูลเก่ากลับเข้าสู่ระบบ</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Export Card */}
+          <div className="flex flex-col p-8 rounded-[2.5rem] bg-gradient-to-br from-blue-50/50 to-white border border-blue-100 shadow-sm hover:shadow-lg transition-all group">
+            <div className="flex items-center justify-between mb-6">
+               <div className="p-4 bg-white rounded-3xl shadow-sm text-blue-600 group-hover:scale-110 transition-transform"><Download size={32} /></div>
+               <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Safe & Secure</span>
+            </div>
+            <h4 className="text-lg font-black text-slate-800 mb-2">Export JSON (สำรองข้อมูล)</h4>
+            <p className="text-xs text-slate-500 leading-relaxed mb-8 flex-1 font-medium">
+              รวบรวมข้อมูลทั้งหมดในระบบ ทั้งบันทึกงาน, รายการจัดซื้อ, และคลังอุปกรณ์ ออกเป็นไฟล์ไฟล์เดียว (.json) 
+              เพื่อให้คุณสามารถนำไปเก็บไว้ในที่ปลอดภัย หรือย้ายไปใช้งานบนเครื่องอื่น
+            </p>
+            <button 
+              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-blue-500/20 hover:scale-105 active:scale-95 transition-all" 
+              onClick={handleExport}
+            >
+              เริ่มสำรองข้อมูล
+            </button>
+          </div>
+
+          {/* Import Card */}
+          <div className="flex flex-col p-8 rounded-[2.5rem] bg-gradient-to-br from-slate-50 to-white border border-slate-200 shadow-sm hover:shadow-lg transition-all group">
+            <div className="flex items-center justify-between mb-6">
+               <div className="p-4 bg-white rounded-3xl shadow-sm text-slate-800 group-hover:scale-110 transition-transform"><Upload size={32} /></div>
+               <div className="flex items-center gap-1.5 px-3 py-1 bg-red-50 text-red-600 rounded-full">
+                  <AlertCircle size={10} />
+                  <span className="text-[9px] font-black uppercase tracking-tight">Overwrite Warning</span>
+               </div>
+            </div>
+            <h4 className="text-lg font-black text-slate-800 mb-2">Import JSON (เรียกคืนข้อมูล)</h4>
+            <p className="text-xs text-slate-500 leading-relaxed mb-8 flex-1 font-medium">
+              เลือกไฟล์สำรองข้อมูล (.json) ที่คุณเคยบันทึกไว้ เพื่อกู้คืนสถานะข้อมูลทั้งหมดกลับมาสู่ระบบ 
+              เหมาะสำหรับการย้ายเครื่องหรือการติดตั้งระบบใหม่
+            </p>
+            
+            <div className="space-y-4">
+              <label className="block w-full text-center py-4 bg-slate-800 text-white rounded-2xl font-black cursor-pointer uppercase tracking-widest shadow-xl shadow-slate-500/20 hover:scale-105 active:scale-95 transition-all">
+                เลือกไฟล์เพื่อเรียกคืน
+                <input type="file" className="hidden" accept=".json" onChange={handleImport} />
+              </label>
+              <div className="flex items-start gap-3 bg-red-50/50 p-4 rounded-2xl border border-red-100">
+                <Info size={16} className="text-red-500 shrink-0 mt-0.5" />
+                <p className="text-[10px] text-red-700 font-bold leading-normal">
+                  <span className="uppercase text-red-800 block mb-1">ข้อควรระวัง:</span>
+                  การเรียกคืนข้อมูลจะลบข้อมูลปัจจุบันทั้งหมดและแทนที่ด้วยข้อมูลจากไฟล์สำรอง โปรดแน่ใจว่าได้สำรองข้อมูลปัจจุบันไว้ก่อนดำเนินการ
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1507,6 +1752,113 @@ const App: React.FC = () => {
       {activeTab === 'purchases' && <UnifiedTicketView type={TicketType.PURCHASE} />}
       {activeTab === 'assets' && <AssetsView />}
       {activeTab === 'settings' && <SettingsView />}
+
+      {/* Modal แก้ไข Asset */}
+      {editingAsset && (
+        <Modal title="แก้ไขข้อมูลอุปกรณ์" onClose={() => setEditingAsset(null)}>
+          <form className="space-y-4" onSubmit={(e) => {
+            e.preventDefault();
+            const f = new FormData(e.currentTarget);
+            updateAsset({
+              ...editingAsset,
+              name: f.get('name') as string,
+              serialNumber: f.get('serial') as string,
+              category: f.get('category') as string,
+              locationName: f.get('locName') as string,
+              locationCategory: f.get('locCat') as LocationCategory,
+              position: f.get('position') as string,
+              description: f.get('description') as string,
+              staffName: f.get('staffName') as string,
+              status: f.get('status') as any
+            });
+          }}>
+            <div className="space-y-1">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">ชื่ออุปกรณ์</label>
+              <input name="name" type="text" className="w-full p-3 border border-slate-200 rounded-2xl bg-white text-slate-900 font-bold shadow-sm" defaultValue={editingAsset.name} required />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">S/N</label>
+                <input name="serial" type="text" className="w-full p-3 border border-slate-200 rounded-2xl bg-white text-slate-900 font-bold shadow-sm" defaultValue={editingAsset.serialNumber} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">สถานะ</label>
+                <select name="status" className="w-full p-3 border border-slate-200 rounded-2xl bg-white text-slate-900 font-black shadow-sm" defaultValue={editingAsset.status}>
+                  <option value="Active">ปกติ (Active)</option>
+                  <option value="Maintenance">ชำรุด (Maintenance)</option>
+                  <option value="Lost">สูญหาย (Lost)</option>
+                  <option value="Retired">ยกเลิกใช้งาน</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">หมวดหมู่</label>
+                <input name="category" type="text" className="w-full p-3 border border-slate-200 rounded-2xl bg-white text-slate-900 font-bold shadow-sm" defaultValue={editingAsset.category} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">ตำแหน่ง</label>
+                <input name="position" type="text" className="w-full p-3 border border-slate-200 rounded-2xl bg-white text-slate-900 font-bold shadow-sm" defaultValue={editingAsset.position} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">ชื่อพนักงานที่รับผิดชอบ</label>
+                <input name="staffName" type="text" className="w-full p-3 border border-slate-200 rounded-2xl bg-white text-slate-900 font-bold shadow-sm" defaultValue={editingAsset.staffName} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">ชื่อสถานที่</label>
+                <input name="locName" type="text" className="w-full p-3 border border-slate-200 rounded-2xl bg-white text-slate-900 font-bold shadow-sm" defaultValue={editingAsset.locationName} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">ประเภทสถานที่</label>
+              <select name="locCat" className="w-full p-3 border border-slate-200 rounded-2xl bg-white text-slate-900 font-bold shadow-sm" defaultValue={editingAsset.locationCategory}>
+                <option value={LocationCategory.SHIP}>บนเรือ</option>
+                <option value={LocationCategory.OFFICE}>สำนักงาน</option>
+                <option value={LocationCategory.PORT}>ท่าเรือ</option>
+                <option value={LocationCategory.SHIPYARD}>อู่เรือ</option>
+                <option value={LocationCategory.WAT_RAJSINGKORN}>วัดราชสิงขร</option>
+                <option value={LocationCategory.GAS_STATION}>ปั้มน้ำมัน</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">รายละเอียด</label>
+              <textarea name="description" className="w-full p-3 border border-slate-200 rounded-2xl bg-white text-slate-900 h-24 shadow-sm font-medium" defaultValue={editingAsset.description} />
+            </div>
+            
+            {/* Display/Edit Image in Modal */}
+            <div className="space-y-3">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">รูปถ่ายอุปกรณ์</label>
+              <div className="flex gap-4">
+                {editingAsset.imageUrl && (
+                  <div className="w-20 h-20 rounded-xl overflow-hidden border border-slate-100 relative group">
+                    <img src={editingAsset.imageUrl} className="w-full h-full object-cover" alt="Asset" />
+                    <button type="button" onClick={() => updateAsset({...editingAsset, imageUrl: undefined})} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100">
+                      <X size={10} strokeWidth={4} />
+                    </button>
+                  </div>
+                )}
+                <label className="w-20 h-20 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-blue-50 transition-all">
+                  <Plus size={16} className="text-slate-400" />
+                  <input type="file" accept="image/jpeg" className="hidden" onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (file && file.type.match('image/jp.*')) {
+                      const base64 = await fileToBase64(file);
+                      setEditingAsset({...editingAsset, imageUrl: base64});
+                    }
+                  }} />
+                </label>
+              </div>
+            </div>
+
+            <div className="flex gap-4 pt-4 border-t border-slate-50">
+              <button type="button" onClick={() => setEditingAsset(null)} className="flex-1 py-3 bg-slate-100 rounded-2xl font-black text-slate-500 uppercase tracking-widest">ยกเลิก</button>
+              <button type="submit" className="flex-1 py-3 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-blue-500/20">บันทึกข้อมูล</button>
+            </div>
+          </form>
+        </Modal>
+      )}
 
       {/* Modal แก้ไข Ticket (ซ่อม/จัดซื้อ) */}
       {editingTicket && (
